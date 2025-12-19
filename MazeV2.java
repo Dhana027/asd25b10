@@ -276,3 +276,22 @@ public class MazeV2 extends JPanel {
         for (Point p : path) { animList.add(p); repaint(); sleep(DELAY_PATH); }
         isRunning = false;
     }
+
+    private void updateAlgoStats(String algo, int steps, int cost) {
+        String text = String.format("Steps: %d | Cost: %d", steps, cost);
+        SwingUtilities.invokeLater(() -> {
+            switch (algo) {
+                case "BFS": if(statBFS != null) statBFS.setText("BFS: " + text); break;
+                case "DFS": if(statDFS != null) statDFS.setText("DFS: " + text); break;
+                case "Dijkstra": if(statDijk != null) statDijk.setText("Dijk: " + text); break;
+                case "A*": if(statAStar != null) statAStar.setText("A*: " + text); break;
+            }
+        });
+    }
+
+    private void resetAllStats() {
+        if(statBFS != null) statBFS.setText("BFS: -");
+        if(statDFS != null) statDFS.setText("DFS: -");
+        if(statDijk != null) statDijk.setText("Dijk: -");
+        if(statAStar != null) statAStar.setText("A*: -");
+    }
