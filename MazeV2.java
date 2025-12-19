@@ -213,3 +213,66 @@ public class MazeV2 extends JPanel {
             finishRun("DFS", p, found);
         }).start();
     }
+
+    public void solveDijkstra() {
+        if (isRunning) return; prepareRun("Dijkstra");
+        new Thread(() -> {
+            PriorityQueue<Node> pq = new PriorityQueue<>(); int[][] dist = new int[ROWS][COLS];
+            for(int[] r : dist) Arrays.fill(r, Integer.MAX_VALUE); Map<Point, Point> pa = new HashMap<>();
+            dist[startPos.x][startPos.y] = 0; pq.add(new Node(startPos, 0)); boolean found = false;
+            while (!pq.isEmpty()) {
+                Node cur = pq.poll(); Point cp = cur.p; if (cur.val > dist[cp.x][cp.y]) continue;
+                currentHead = cp; currentVisited.add(cp); repaint(); sleep(DELAY_SCAN);
+                if (cp.equals(exitPos)) { found = true; break; }
+                int[][] d = {{-1,0},{1,0},{0,-1},{0,1}};
+                for (int[] dir : d) { Point np = new Point(cp.x+dir[0], cp.y+dir[1]);
+                    if (isValidStep(np)) { int nc = dist[cp.x][cp.y] + getCellCost(np.x, np.y);
+                        if (nc < dist[np.x][np.y]) { dist[np.x][np.y] = nc; pq.add(new Node(np, nc)); pa.put(np, cp); }
+                    }
+                }
+            }
+            finishRun("Dijkstra", pa, found);
+        }).start();
+    }
+
+    public void solveAStar() {
+        if (isRunning) return; prepareRun("A*");
+        new Thread(() -> {
+            PriorityQueue<Node> pq = new PriorityQueue<>(); int[][] gs = new int[ROWS][COLS];
+            for(int[] r : gs) Arrays.fill(r, Integer.MAX_VALUE); Map<Point, Point> pa = new HashMap<>();
+            gs[startPos.x][startPos.y] = 0; pq.add(new Node(startPos, 0)); boolean found = false;
+            while (!pq.isEmpty()) {
+                Node cur = pq.poll(); Point cp = cur.p; if (cur.val > gs[cp.x][cp.y]) continue;
+                currentHead = cp; currentVisited.add(cp); repaint(); sleep(DELAY_SCAN);
+                if (cp.equals(exitPos)) { found = true; break; }
+                int[][] d = {{-1,0},{1,0},{0,-1},{0,1}};
+                for (int[] dir : d) { Point np = new Point(cp.x+dir[0], cp.y+dir[1]);
+                    if (isValidStep(np)) { int tg = gs[cp.x][cp.y] + getCellCost(np.x, np.y);
+                        if (tg < gs[np.x][np.y]) { gs[np.x][np.y] = tg; int f = tg + (Math.abs(np.x-exitPos.x)+Math.abs(np.y-exitPos.y));
+                            Node nn = new Node(np, tg); nn.priority = f; pq.add(nn); pa.put(np, cp); }
+                    }
+                }
+            }
+            finishRun("A*", pa, found);
+        }).start();
+    }
+
+    private void finishRun(String algoName, Map<Point, Point> parents, boolean found) {
+        currentHead = null;
+        if (!found) { updateStatus(algoName + " Failed!"); isRunning = false; repaint(); return; }
+
+        List<Point> path = new ArrayList<>(); Point curr = exitPos; int cost = 0;
+        while (curr != null) { path.add(curr); cost += getCellCost(curr.x, curr.y); curr = parents.get(curr); }
+        Collections.reverse(path);
+
+        activePaths.put(algoName, new ArrayList<>());
+        cost -= getCellCost(startPos.x, startPos.y);
+        int steps = path.size() - 1;
+
+        updateStatus(algoName + " Finished.");
+        updateAlgoStats(algoName, steps, cost);
+
+        List<Point> animList = activePaths.get(algoName);
+        for (Point p : path) { animList.add(p); repaint(); sleep(DELAY_PATH); }
+        isRunning = false;
+    }
