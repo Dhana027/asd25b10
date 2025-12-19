@@ -295,3 +295,233 @@ public class MazeV2 extends JPanel {
         if(statDijk != null) statDijk.setText("Dijk: -");
         if(statAStar != null) statAStar.setText("A*: -");
     }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        for (int r = 0; r < ROWS; r++) {
+            for (int c = 0; c < COLS; c++) {
+                drawCell(g2, r, c, c * CELL_SIZE, r * CELL_SIZE);
+            }
+        }
+
+        activePaths.forEach((algo, pathList) -> {
+            if (pathList.isEmpty()) return;
+            Color color = Color.WHITE; int ox = 0, oy = 0;
+            switch (algo) {
+                case "BFS": color = COLOR_BFS; ox = -6; oy = -6; break;
+                case "DFS": color = COLOR_DFS; ox = 6; oy = -6; break;
+                case "Dijkstra": color = COLOR_DIJKSTRA; ox = -6; oy = 6; break;
+                case "A*": color = COLOR_ASTAR; ox = 6; oy = 6; break;
+            }
+            g2.setColor(color);
+            g2.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+            if (pathList.size() > 1) {
+                int[] xPoints = new int[pathList.size()];
+                int[] yPoints = new int[pathList.size()];
+                for (int i=0; i<pathList.size(); i++) {
+                    Point p = pathList.get(i);
+                    xPoints[i] = p.y * CELL_SIZE + CELL_SIZE/2 + ox;
+                    yPoints[i] = p.x * CELL_SIZE + CELL_SIZE/2 + oy;
+                }
+                g2.drawPolyline(xPoints, yPoints, pathList.size());
+            }
+            for(Point p : pathList) {
+                g2.fillOval(p.y * CELL_SIZE + CELL_SIZE/2 + ox - 3, p.x * CELL_SIZE + CELL_SIZE/2 + oy - 3, 6, 6);
+            }
+        });
+
+        if (currentHead != null) {
+            g2.setColor(new Color(255, 100, 0, 200));
+            int hx = currentHead.y * CELL_SIZE, hy = currentHead.x * CELL_SIZE;
+            g2.fillOval(hx + 4, hy + 4, CELL_SIZE - 8, CELL_SIZE - 8);
+            g2.setColor(Color.WHITE); g2.setStroke(new BasicStroke(2));
+            g2.drawOval(hx + 4, hy + 4, CELL_SIZE - 8, CELL_SIZE - 8);
+        }
+        drawMarker(g2, startPos, Color.WHITE, "S");
+        drawMarker(g2, exitPos, new Color(255, 50, 50), "E");
+    }
+
+    private void drawCell(Graphics2D g2, int r, int c, int x, int y) {
+        int type = maze[r][c];
+        if (type == TYPE_WALL) {
+            g2.setColor(COL_WALL_BASE); g2.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+            g2.setColor(COL_WALL_TOP); g2.fillRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+        } else {
+            if (type == TYPE_GRASS) g2.setColor(new Color(34, 139, 34));
+            else if (type == TYPE_MUD) g2.setColor(new Color(101, 67, 33));
+            else if (type == TYPE_WATER) g2.setColor(new Color(0, 105, 148));
+            g2.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+
+            if (type == TYPE_GRASS) {
+                g2.setColor(new Color(50, 205, 50, 100)); g2.fillRect(x+5, y+5, 4, 4); g2.fillRect(x+20, y+20, 3, 3);
+            } else if (type == TYPE_WATER) {
+                g2.setColor(new Color(135, 206, 250, 80)); g2.drawLine(x+5, y+10, x+15, y+10);
+            } else if (type == TYPE_MUD) {
+                g2.setColor(new Color(60, 40, 10, 80)); g2.fillOval(x+8, y+8, 6, 6);
+            }
+            if (currentVisited.contains(new Point(r, c))) {
+                g2.setColor(new Color(255, 255, 255, 40)); g2.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+            }
+        }
+    }
+
+    private void drawMarker(Graphics2D g2, Point p, Color c, String text) {
+        int x = p.y * CELL_SIZE, y = p.x * CELL_SIZE;
+        g2.setColor(new Color(0,0,0,100)); g2.fillOval(x+6, y+8, CELL_SIZE-10, CELL_SIZE-10);
+        g2.setColor(c); g2.fillOval(x+4, y+4, CELL_SIZE-8, CELL_SIZE-8);
+        g2.setColor(Color.BLACK); g2.setStroke(new BasicStroke(2)); g2.drawOval(x+4, y+4, CELL_SIZE-8, CELL_SIZE-8);
+        g2.setFont(new Font("Arial", Font.BOLD, 14)); g2.drawString(text, x+11, y+21);
+    }
+
+    private void updateStatus(String text) { if (lblStatus != null) lblStatus.setText(text); }
+
+    private void sleep(int millis) { try { Thread.sleep(millis); } catch (Exception e) {} }
+    private boolean isValid(int r, int c) { return r > 0 && r < ROWS - 1 && c > 0 && c < COLS - 1; }
+    private boolean isValidStep(Point p) { return p.x >= 0 && p.x < ROWS && p.y >= 0 && p.y < COLS && maze[p.x][p.y] != TYPE_WALL; }
+
+    class Node implements Comparable<Node> {
+        Point p; int val; int priority;
+        public Node(Point p, int val) { this.p = p; this.val = val; this.priority = val; }
+        public int compareTo(Node o) { return Integer.compare(this.priority, o.priority); }
+    }
+
+    public static void main(String[] args) {
+        try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception e) {}
+
+        JFrame frame = new JFrame("Maze Game - Path Finder Algorithm");
+        MazeV2 gamePanel = new MazeV2();
+
+        frame.setLayout(new BorderLayout());
+        frame.add(gamePanel, BorderLayout.CENTER);
+
+        JPanel sidebar = new JPanel();
+        sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
+        sidebar.setPreferredSize(new Dimension(250, 0));
+        sidebar.setBackground(new Color(40, 40, 45));
+        sidebar.setBorder(new EmptyBorder(15, 15, 15, 15));
+
+        JLabel title = new JLabel("MAZE COMMAND");
+        title.setForeground(Color.CYAN);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+        sidebar.add(title);
+        sidebar.add(Box.createVerticalStrut(20));
+
+        addSectionTitle(sidebar, "AUDIO CONTROL");
+        JButton btnMute = createModernButton("Mute Sound", new Color(100, 100, 100));
+        JSlider volSlider = new JSlider(0, 100, 75);
+        volSlider.setBackground(new Color(40, 40, 45));
+        btnMute.addActionListener(e -> {
+            gamePanel.toggleMute();
+            btnMute.setText(gamePanel.isMuted() ? "Unmute" : "Mute Sound");
+        });
+        volSlider.addChangeListener(e -> gamePanel.setVolumeByPercentage(volSlider.getValue()));
+        sidebar.add(btnMute); sidebar.add(Box.createVerticalStrut(5)); sidebar.add(volSlider);
+        sidebar.add(Box.createVerticalStrut(15));
+
+        addSectionTitle(sidebar, "MAP GENERATOR");
+        JButton btnGen = createModernButton("Generate New Map", new Color(46, 204, 113));
+        JButton btnClear = createModernButton("Clear Lines", new Color(231, 76, 60));
+        btnGen.addActionListener(e -> gamePanel.generateComplexMaze());
+        btnClear.addActionListener(e -> {
+            gamePanel.activePaths.clear();
+            gamePanel.currentVisited.clear();
+            gamePanel.resetAllStats();
+            gamePanel.repaint();
+        });
+        sidebar.add(btnGen); sidebar.add(Box.createVerticalStrut(5)); sidebar.add(btnClear);
+        sidebar.add(Box.createVerticalStrut(15));
+
+        addSectionTitle(sidebar, "ALGORITHMS");
+        JButton btnBFS = createModernButton("BFS", new Color(0, 200, 200));
+        JButton btnDFS = createModernButton("DFS", new Color(200, 150, 0));
+        JButton btnDijk = createModernButton("Dijkstra", new Color(200, 200, 200));
+        JButton btnA = createModernButton("A*", new Color(255, 50, 80));
+
+        btnBFS.addActionListener(e -> gamePanel.solveBFS());
+        btnDFS.addActionListener(e -> gamePanel.solveDFS());
+        btnDijk.addActionListener(e -> gamePanel.solveDijkstra());
+        btnA.addActionListener(e -> gamePanel.solveAStar());
+
+        sidebar.add(btnBFS); sidebar.add(Box.createVerticalStrut(5));
+        sidebar.add(btnDFS); sidebar.add(Box.createVerticalStrut(5));
+        sidebar.add(btnDijk); sidebar.add(Box.createVerticalStrut(5));
+        sidebar.add(btnA); sidebar.add(Box.createVerticalStrut(20));
+
+        addSectionTitle(sidebar, "STATISTICS");
+        statBFS = createStatLabel("BFS: -", COLOR_BFS);
+        statDFS = createStatLabel("DFS: -", COLOR_DFS);
+        statDijk = createStatLabel("Dijk: -", COLOR_DIJKSTRA);
+        statAStar = createStatLabel("A*: -", COLOR_ASTAR);
+
+        sidebar.add(statBFS);
+        sidebar.add(statDFS);
+        sidebar.add(statDijk);
+        sidebar.add(statAStar);
+        sidebar.add(Box.createVerticalStrut(20));
+
+        lblStatus = new JLabel("Ready");
+        lblStatus.setForeground(Color.LIGHT_GRAY);
+        lblStatus.setAlignmentX(Component.CENTER_ALIGNMENT);
+        sidebar.add(lblStatus);
+
+        frame.add(sidebar, BorderLayout.EAST);
+        frame.pack();
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+    }
+
+    private static void addSectionTitle(JPanel panel, String text) {
+        JLabel label = new JLabel(text);
+        label.setForeground(new Color(150, 150, 160));
+        label.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        label.setAlignmentX(Component.CENTER_ALIGNMENT);
+        panel.add(label);
+        panel.add(Box.createVerticalStrut(5));
+    }
+
+    private static JLabel createStatLabel(String text, Color color) {
+        JLabel lbl = new JLabel(text);
+        lbl.setForeground(color);
+        lbl.setFont(new Font("Consolas", Font.BOLD, 12));
+        lbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+        lbl.setBorder(new EmptyBorder(0, 0, 5, 0));
+        return lbl;
+    }
+
+    private static JButton createModernButton(String text, Color baseColor) {
+        JButton btn = new JButton(text) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                if (getModel().isPressed()) g2.setColor(baseColor.darker());
+                else if (getModel().isRollover()) g2.setColor(baseColor.brighter());
+                else g2.setColor(baseColor);
+                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 10, 10));
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Segoe UI", Font.BOLD, 12));
+                FontMetrics fm = g2.getFontMetrics();
+                int x = (getWidth() - fm.stringWidth(getText())) / 2;
+                int y = (getHeight() + fm.getAscent()) / 2 - 2;
+                g2.drawString(getText(), x, y);
+                g2.dispose();
+            }
+        };
+        btn.setPreferredSize(new Dimension(220, 35));
+        btn.setMaximumSize(new Dimension(220, 35));
+        btn.setContentAreaFilled(false);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        return btn;
+    }
+}
+
