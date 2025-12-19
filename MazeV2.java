@@ -521,7 +521,7 @@ public class MazeV2 extends JPanel {
         btn.setBorderPainted(false);
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        return btn;
-    }
+        return btn;
+    }
 }
 
